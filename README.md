@@ -63,6 +63,7 @@ makeSqlSchema({
   outputFilepath,
   databaseName: 'dbname',
   tablePrefix: 'test_',
+  dbType: 'mysql' // 'postgres'
 })
 ```
 The script above will produce this file:
@@ -143,7 +144,7 @@ ON FIELD_DEFINITION:
   * Marks a generated column.
   * Example: `@sql(generated: "(data->>'$.test')")`. See [main-test.ts](__tests__/main-test.ts#L137) for more examples.
 
-## SQL Features Supported<sup>1</sup>:
+## SQL Features Supported:
 - [x] Auto Increment
 - [x] Default
 - [x] Index
@@ -156,4 +157,4 @@ ON FIELD_DEFINITION:
 - [X] Foreign Key (via @constraints)
 - [x] Generated Columns
 
-<sup>1</sup>Only MySQL is supported at the moment.
+MySQL and PostgreSQL are supported.

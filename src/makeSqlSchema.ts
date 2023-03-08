@@ -23,6 +23,7 @@ export interface IMakeSqlSchemaInput extends IExecutableSchemaDefinition {
   outputFilepath: string
   databaseName: string
   tablePrefix?: string
+  dbType?: 'mysql' | 'postgres'
 }
 
 export interface ITable {
@@ -78,7 +79,12 @@ export function makeSqlSchema(options: IMakeSqlSchemaInput): void {
   makeExecutableSchema(options)
   setDefaults()
   gatherIndices()
-  renderCreateSchemaScript(databaseName, tablePrefix, outputFilepath)
+  renderCreateSchemaScript(
+    options.dbType || 'mysql',
+    databaseName,
+    tablePrefix,
+    outputFilepath
+  )
 }
 
 function setDefaults() {
@@ -216,6 +222,7 @@ function gatherIndices() {
 }
 
 function renderCreateSchemaScript(
+  dbType: string,
   databaseName: string,
   tablePrefix: string,
   outputFilepath: string
@@ -242,11 +249,18 @@ function renderCreateSchemaScript(
 
     const primaryKeyName = (table.primaryIndex && table.primaryIndex.name) || ''
 
-    let indexDefinitions = (table.secondaryIndices || []).map(column => {
-      return `INDEX \`${column.name.toUpperCase()}INDEX\` (\`${
-        column.name
-      }\` ASC)`
-    })
+    let indexDefinitions =
+      dbType === 'mysql'
+        ? (table.secondaryIndices || []).map(column => {
+            return `INDEX \`${column.name.toUpperCase()}INDEX\` (\`${
+              column.name
+            }\` ASC)`
+          })
+        : (table.secondaryIndices || []).map(column => {
+            return `CREATE INDEX \`${column.name.toUpperCase()}INDEX\` ON \`${databaseName}\`.\`${tablePrefix}${
+              table.name
+            }\` (\`${column.name}\` ASC)`
+          })
     if (indexDefinitions.length > 0) {
       indexDefinitions = [''].concat(indexDefinitions)
     }
@@ -259,14 +273,23 @@ function renderCreateSchemaScript(
       ? ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
       : ''
 
-    tableDefinitions.push(
-      `CREATE TABLE \`${databaseName}\`.\`${tablePrefix}${table.name}\` (
+    if (dbType === 'mysql') {
+      tableDefinitions.push(
+        `CREATE TABLE \`${databaseName}\`.\`${tablePrefix}${table.name}\` (
   ${columnDefinitions.join(',\n  ')},
   PRIMARY KEY (\`${primaryKeyName}\`)${indexDefinitions.join(
-        ',\n  '
-      )}${constraints}
+          ',\n  '
+        )}${constraints}
 )${unicodeModifier};`
-    )
+      )
+    } else if (dbType === 'postgres') {
+      tableDefinitions.push(
+        `CREATE TABLE \`${databaseName}\`.\`${tablePrefix}${table.name}\` (
+  ${columnDefinitions.join(',\n  ')},
+  PRIMARY KEY (\`${primaryKeyName}\`)${constraints}
+)${indexDefinitions.join(';\n')};`
+      )
+    }
   })
 
   fs.outputFileSync(`${outputFilepath}`, tableDefinitions.join('\n\n'))
